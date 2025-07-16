@@ -1,51 +1,88 @@
-name: Publish
+Parcels Table:
+- tracking_id: D2D12345
+- sender_name: "Ravi"
+- recipient_name: "John"
+- current_status: "In Transit"
+- timeline: [ 
+    { status: "Picked Up", time: "2025-07-16 10:30" },
+    { status: "In Transit", time: "2025-07-16 14:00" },
+    ...
+  ]
+- origin: "Chennai"
+- destination: "New York"
+[Customer]
+🔽
+Enter D2D12345
+🔽
+Gets real-time status from D2D server
+🔽
+Displays timeline UI
 
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+[Admin]
+🔽
+Updates parcel status using admin panel
+🔽
+Push notifications sent to customer
+// D2D EXPRESS - Flutter-style UI with Firebase Backend (Prototype)
 
-jobs:
-  publish_npm:
-    if: "(github.repository == 'invertase/react-native-firebase') && (github.event_name == 'workflow_dispatch')"
-    name: 'NPM'
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # to enable use of OIDC for npm provenance
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 'main'
-          fetch-depth: 0
-          # Repository admin required to evade PR+checks branch protection
-          token: ${{ secrets.GH_TOKEN }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Yarn Install
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 15
-          retry_wait_seconds: 60
-          max_attempts: 3
-          command: yarn && yarn lerna:prepare
-      - name: GIT Setup
-        # Alter branding of release commit, despite GITHUB_TOKEN having real owner
-        run: |
-          git config --global user.name 'Invertase Publisher'
-          git config --global user.email 'oss@invertase.io'
-      - name: Publish Packages
-        # for lerna, you must write the token out to .npmrc like this
-        run: |
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
-          git diff --exit-code
-          yarn lerna changed
-          yarn lerna version --yes --force-publish=*
-          yarn lerna publish from-package --yes
-        env:
-          # new style token w/scope for `@react-native-firebase` required
-          # to work with npmjs.com 2FA-or-automation-token package requirement
-          NPM_TOKEN: ${{ secrets.MIKEHARDY_NPM_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+import React from "react"; import { View, Text, TextInput, Button, ScrollView, Alert } from "react-native"; import firestore from "@react-native-firebase/firestore";
+
+export default function D2DTrackingApp() { const [trackingId, setTrackingId] = React.useState(""); const [status, setStatus] = React.useState(null);
+
+const trackParcel = async () => { if (!trackingId.trim()) { Alert.alert("Please enter a tracking number."); return; }
+
+try {
+  const doc = await firestore()
+    .collection("parcels")
+    .doc(trackingId)
+    .get();
+
+  if (doc.exists) {
+    setStatus(doc.data());
+  } else {
+    Alert.alert("Tracking ID not found.");
+    setStatus(null);
+  }
+} catch (error) {
+  console.error("Error fetching tracking info:", error);
+  Alert.alert("Error fetching data.");
+}
+
+};
+
+return ( <ScrollView style={{ padding: 20 }}> <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 20 }}> D2D EXPRESS - Track Your Shipment </Text>
+
+<TextInput
+    placeholder="Enter Tracking Number"
+    style={{ borderWidth: 1, borderColor: "#ccc", padding: 10, marginBottom: 10 }}
+    value={trackingId}
+    onChangeText={setTrackingId}
+  />
+
+  <Button title="Track Now" onPress={trackParcel} />
+
+  {status && (
+    <View style={{ marginTop: 30 }}>
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>Tracking ID: {trackingId}</Text>
+      <Text style={{ fontSize: 16, marginTop: 10 }}>Current Status: {status.current_status}</Text>
+
+      <View style={{ marginTop: 20 }}>
+        <Text style={{ fontWeight: "bold" }}>Tracking Timeline:</Text>
+        {status.timeline.map((item, index) => (
+          <Text key={index}>• {item.status} - {item.time}</Text>
+        ))}
+      </View>
+    </View>
+  )}
+</ScrollView>
+
+); }
+
+{
+  "current_status": "In Transit",
+  "timeline": [
+    { "status": "Picked Up", "time": "2025-07-15 10:30" },
+    { "status": "In Transit", "time": "2025-07-16 14:00" }
+  ]
+}
+npm install @react-native-firebase/app @react-native-firebase/firestore
